@@ -1,11 +1,14 @@
-import puppeteer from 'puppeteer';
-import fetch from 'node-fetch';
-import Tesseract from 'tesseract.js';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-// Usage: node scripts/ocr_cert_from_ebay.js <itemId>
+
+// Usage: node src/app/utils/ocr_cert_from_ebay.js <itemId>
+
+puppeteer.use(StealthPlugin());
+
 const itemId = process.argv[2];
 if (!itemId) {
-  console.error('Usage: node scripts/ocr_cert_from_ebay.js <itemId>');
+  console.error('Usage: node src/app/utils/ocr_cert_from_ebay.js <itemId>');
   process.exit(1);
 }
 
@@ -35,68 +38,69 @@ function findUniqueImage(urls) {
     'sec-fetch-dest': 'document',
     'upgrade-insecure-requests': '1'
   });
-  await page.goto(itemUrl, { waitUntil: 'domcontentloaded' });
+
+  await page.goto(itemUrl, { waitUntil: 'domcontentloaded'});
   await new Promise(resolve => setTimeout(resolve, 3000));
-  // Get all large image URLs on the page
-  const largeImgSrcs = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('img'))
+
+  const { largeImgSrcs, grade, price } = await page.evaluate(() => {
+    // Large image URLs
+    const largeImgSrcs = Array.from(document.querySelectorAll('img'))
       .filter(img => img.width > 200 && img.height > 200)
       .map(img => img.src);
-  });
 
+    // Grade extraction
+    let grade = null;
+    const insights = document.getElementById('vi_psa_card_insights');
+    if (insights) {
+      const valEl = insights.querySelector('.elevated-info__item__value');
+      if (valEl) {
+        const g = valEl.textContent?.trim();
+        const match = g && g.match(/psa\s*(\d+)/i);
+        if (match) {
+          grade = parseInt(match[1], 10);
+        } else if (g && /^\d+$/.test(g)) {
+          grade = parseInt(g, 10);
+        }
+      }
+    }
+    // Price extraction
+    let price = null;
+    const priceDiv = document.querySelector('div.x-price-primary');
+    if (priceDiv) {
+      const priceSpan = priceDiv.querySelector('span.ux-textspans');
+      let priceText = priceSpan?.textContent?.trim();
+      if (priceText) {
+        priceText = priceText.replace(/^US\s*/i, '');
+        price = priceText;
+      }
+    }
+    return { largeImgSrcs, grade, price };
+  });
   // Find the highest resolution images for front and back
   const targetImgFront = largeImgSrcs.find(src => src && src.includes('1600')) || null;
   // Find the unique image by /g/.../s and force the filename to s-l1600.webp
   const uniqueImg = findUniqueImage(largeImgSrcs);
   const targetImgBack = uniqueImg ? uniqueImg.replace(/\/[^/]*$/, '/s-l1600.webp') : null;
 
-  if (!targetImgFront || !targetImgBack) {
-    await browser.close();
-    process.stdout.write(JSON.stringify({ cert: null, imgUrlFront: null, imgUrlBack: null, ocrText: largeImgSrcs }));
-    process.exit(0);
-  }
   try {
-    const response = await fetch(targetImgFront);
-  if (!response.ok) throw new Error('Failed to fetch image');
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const { data: { text } } = await Tesseract.recognize(buffer, 'eng', {
-      logger: () => {},
-      langPath: 'https://tessdata.projectnaptha.com/4.0.0_best',
-    });
-  const certMatches = text.match(/\b\d{8,9}\b/g);
-  // Try to find a grade by keyword mapping
-  let grade = null;
-  const gradeMap = [
-    { re: /GEM/i, val: 10 },
-    { re: /MINT/i, val: 9 },
-    { re: /NM[-\s]*MT/i, val: 8 }, // NM-MT or NM MT
-    { re: /\bNM\b/i, val: 7 },
-    { re: /EX\s*-\b/i, val: 6 },
-    { re: /\bEX\b/i, val: 5 },
-    { re: /VG\s*-\b/i, val: 4 },
-    { re: /\bVG\b/i, val: 3 },
-    { re: /GOOD/i, val: 2 },
-    { re: /\bPR\b/i, val: 1 },
-  ];
-  for (const { re, val } of gradeMap) {
-    if (re.test(text)) {
-      grade = val;
-      break;
+    if (!targetImgFront || !targetImgBack) {
+      await browser.close();
+      process.stdout.write(JSON.stringify({ imgUrlFront: 'No Image', imgUrlBack: 'No Image' }));
+      process.exit(0);
     }
-  }
-  if (grade === null) {
-    process.stdout.write(JSON.stringify({ cert: null, imgUrlFront: null, imgUrlBack: null, ocrText: 'Null Grade' }));
-    process.exit(0);
-  }
-  await browser.close();
-  // Output only pure JSON, no trailing newline or extra characters
-  const jsonOut = JSON.stringify({ cert: certMatches && certMatches.length ? certMatches[0] : null, grade, imgUrlFront: targetImgFront, imgUrlBack: targetImgBack, ocrText: text });
-  process.stdout.write(jsonOut);
+    if (!grade) {
+      await browser.close();
+      process.stdout.write(JSON.stringify({ grade: 'Null Grade' }));
+      process.exit(0);
+    }
+    await browser.close();
+    // Output only pure JSON, no trailing newline or extra characters on Success
+    const jsonOut = JSON.stringify({ grade, imgUrlFront: targetImgFront, imgUrlBack: targetImgBack, price });
+    process.stdout.write(jsonOut);
   } catch (err) {
-  await browser.close();
-  // Output only pure JSON, no trailing newline or extra characters
-  const jsonOut = JSON.stringify({ cert: null, imgUrlFront: targetImgFront, imgUrlBack: targetImgBack, ocrText: null });
-  process.stdout.write(jsonOut);
+    await browser.close();
+    // Output only pure JSON, no trailing newline or extra characters
+    const jsonOut = JSON.stringify({ ocrText: err });
+    process.stdout.write(jsonOut);
   }
 })();

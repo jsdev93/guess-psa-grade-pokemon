@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PSA Pokémon Grade Guess",
+  title: "Guess The PSA Grade - Pokémon Edition",
   description: "Guess the grades (1–10) of PSA Pokémon slabs from cert images",
 };
 

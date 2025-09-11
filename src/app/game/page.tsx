@@ -1,15 +1,107 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
+// CardGuessControls: handles price hint, grade select, and guess button
+type CardGuessControlsProps = {
+  card: GameItem;
+  priceHintUsed: boolean;
+  showPrice: boolean;
+  onPriceHint: () => void;
+  onSelect: (val: number) => void;
+  onGuess: () => void;
+};
+function CardGuessControls({ card, priceHintUsed, showPrice, onPriceHint, onSelect, onGuess }: CardGuessControlsProps) {
+  return (
+    <div className="bg-gradient-to-br from-[#e6f0fa] via-[#f5f6fa] to-[#e9ecf3] rounded-2xl border border-[#e5e7eb] shadow p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 my-2">
+      {card.price && !priceHintUsed && !showPrice && (
+        <button
+          className="mb-2 px-4 py-2 rounded-lg border-2 border-[#0057b8] bg-[#e6f0fa] text-[#0057b8] text-lg font-bold shadow hover:bg-[#0057b8] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#0057b8] transition-colors"
+          onClick={onPriceHint}
+          type="button"
+        >
+          Show Price Hint
+        </button>
+      )}
+      {card.price && (showPrice || card.solved) && (
+        <div className="text-lg text-slate-500 mb-2">Price: <span className="font-mono">{card.price}</span></div>
+      )}
+      <SelectGrade value={card.guessed} disabled={card.solved} onChange={onSelect} />
+      <button
+        className={cx(
+          "w-full rounded-lg border-2 border-[#e41c23] px-6 py-4 text-3xl font-extrabold shadow-lg transition-all",
+          card.solved
+            ? "bg-[#e41c23] text-white hover:bg-[#b71c1c]"
+            : "bg-white text-[#e41c23] hover:bg-[#e41c23] hover:text-white disabled:opacity-60"
+        )}
+        onClick={onGuess}
+        disabled={card.solved || card.guessed == null}
+        style={{fontFamily: 'Roboto, Arial, Helvetica, "Segoe UI", sans-serif'}}>
+        Guess
+      </button>
+    </div>
+  );
+}
+// CardImageCard: visually distinct card for the image/toggle UI
+function CardImageCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-gradient-to-br from-[#f5f6fa] via-[#e6f0fa] to-[#e9ecf3] rounded-2xl border-2 border-[#d1d5db] shadow-lg p-4 sm:p-6 m-2 sm:m-4 flex flex-col items-center justify-center">
+      {children}
+    </div>
+  );
+}
+
+type CardImagesSectionProps = {
+  card: CardItem | GameItem;
+  overlayClass?: string;
+};
+function CardImagesSection({ card, overlayClass }: CardImagesSectionProps) {
+  const solved = 'solved' in card ? card.solved : undefined;
+  const [showFront, setShowFront] = useState(true);
+  const handleToggle = () => setShowFront((v) => !v);
+  return (
+    <div className={cx("transition-colors duration-300 flex flex-col items-center justify-center", overlayClass)} style={{ minWidth: 0 }}>
+      <CardImageCard>
+        <div className="relative flex flex-col items-center justify-center w-full sm:max-w-xs md:max-w-2xl">
+          <button
+            aria-label={showFront ? "Show back of card" : "Show front of card"}
+            onClick={handleToggle}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 border-2 border-[#0057b8] bg-white/90 rounded-full shadow-lg p-2 w-12 h-12 flex items-center justify-center hover:bg-[#e6f0fa] hover:border-[#003974] focus:outline-none focus:ring-2 focus:ring-[#0057b8] transition-all duration-150"
+            style={{ left: 0 }}
+          >
+            <span className="text-3xl text-[#0057b8] font-extrabold drop-shadow">&#8592;</span>
+          </button>
+          <div className="flex-1 flex justify-center w-full">
+            {showFront ? (
+              <ImageWithMask src={card.frontUrl} alt={`${card.title} (front)`} solved={solved} />
+            ) : (
+              <ImageWithMask src={card.backUrl} alt={`${card.title} (back)`} solved={solved} />
+            )}
+          </div>
+          <button
+            aria-label={showFront ? "Show back of card" : "Show front of card"}
+            onClick={handleToggle}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 border-2 border-[#0057b8] bg-white/90 rounded-full shadow-lg p-2 w-12 h-12 flex items-center justify-center hover:bg-[#e6f0fa] hover:border-[#003974] focus:outline-none focus:ring-2 focus:ring-[#0057b8] transition-all duration-150"
+            style={{ right: 0 }}
+          >
+            <span className="text-3xl text-[#0057b8] font-extrabold drop-shadow">&#8594;</span>
+          </button>
+          <div className="mt-2 text-center text-xs text-slate-500 font-semibold">
+            {showFront ? "Front" : "Back"}
+          </div>
+        </div>
+      </CardImageCard>
+    </div>
+  );
+}
+/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState, useRef } from "react";
 
 type CardItem = {
-  cert: string;
   title: string;
   grade: number;     // hidden from user
   frontUrl: string;
   backUrl: string;
-  certUrl: string;
+  price?: string | null;
+  id?: string | number;
 };
 
 type GameItem = CardItem & {
@@ -25,8 +117,20 @@ function cx(...a: (string | false | null | undefined)[]) {
   return a.filter(Boolean).join(" ");
 }
 
+
 export default function GamePage() {
+  const [showPrice, setShowPrice] = useState(false);
+  const [priceHintUsed, setPriceHintUsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('psa_price_hint_used') === '1';
+    }
+    return false;
+  });
   const [card, setCard] = useState<GameItem | null>(null);
+  // Always reset showPrice to false on new card
+  useEffect(() => {
+    setShowPrice(false);
+  }, [card]);
   const [loading, setLoading] = useState(false);
   const [tries, setTries] = useState(0); // tries for current card
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +140,7 @@ export default function GamePage() {
   const [sessionTries, setSessionTries] = useState<number>(0);
 
   const [cooldown, setCooldown] = useState(0);
-
+  // ...existing code...
   // tick down the cooldown once per second
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -70,6 +174,7 @@ export default function GamePage() {
 
     try {
       const r = await fetch("/api/random-pokemon?count=1", { cache: "no-store" });
+  // ...existing code...
       const ct = r.headers.get("content-type") || "";
       if (!ct.includes("application/json")) throw new Error("Non-JSON response");
       const data = await r.json();
@@ -114,86 +219,101 @@ export default function GamePage() {
   function resetStats() {
     setSessionSolved(0);
     setSessionTries(0);
+    setShowPrice(false);
+    setPriceHintUsed(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('psa_price_hint_used');
+    }
     localStorage.setItem(LS_SOLVED, "0");
     localStorage.setItem(LS_TRIES, "0");
   }
 
+  // When price hint is used, persist in localStorage for session
+  const usePriceHint = () => {
+    setShowPrice(true);
+    setPriceHintUsed(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('psa_price_hint_used', '1');
+    }
+  };
+
   return (
-  <main className="mx-auto max-w-4xl p-4 min-h-screen">
+  <main
+    className="mx-auto max-w-5xl p-2 sm:p-4 md:p-6 min-h-screen font-sans flex flex-col items-center justify-start bg-gradient-to-br from-[#e6f0fa] via-[#f5f6fa] to-[#e9ecf3]"
+    style={{
+      fontFamily: 'Roboto, Arial, Helvetica, "Segoe UI", sans-serif',
+      color: '#1a1a1a',
+      minHeight: '100dvh',
+      boxSizing: 'border-box',
+    }}
+  >
       {/* Session stats */}
-      <div className="mb-4 rounded-2xl border border-slate-200 bg-white shadow p-4">
-        <h1 className="text-2xl font-semibold mb-2">PSA Pokémon Grade Guess</h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-1.5">
+  <div className="mb-4 sm:mb-6 rounded-2xl border border-[#d1d5db] bg-gradient-to-br from-[#e6f0fa] via-[#f5f6fa] to-[#e9ecf3] shadow-lg p-3 sm:p-4 md:p-6 w-full max-w-3xl mx-auto">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2 sm:mb-4 tracking-tight text-[#1a1a1a] text-center">PSA Pokémon Grade Guess</h1>
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-base sm:text-xl">
+          <span className="shrink-0 rounded-xl border border-[#059f2e] bg-[#c1e9cc] text-[#15c30f] px-4 py-2 font-bold">
             Cards Solved: <b>{sessionSolved}</b>
           </span>
-          <span className="rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 px-3 py-1.5">
+          <span className="shrink-0 rounded-xl border border-[#0057b8] bg-[#e6f0fa] text-[#0057b8] px-4 py-2 font-bold">
             Number of Tries: <b>{sessionTries}</b>
           </span>
-          <span className="rounded-xl border border-slate-200 bg-slate-50 text-slate-800 px-3 py-1.5">
+          <span className="shrink-0 rounded-xl border border-[#d1d5db] bg-[#f5f6fa] text-[#1a1a1a] px-4 py-2 font-bold">
             This Card Tries: <b>{tries}</b>
           </span>
-          <div className="ml-auto flex gap-2">
-            <button onClick={resetStats} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">
-              Reset Stats
-            </button>
-            <button
-              onClick={handleNewCard}
-              disabled={loading || cooldown > 0 || sessionTries >= 20}
-              className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm disabled:opacity-60"
-            >
-              {loading
-                ? "Loading…"
-                : cooldown > 0
-                  ? `Wait ${cooldown}s`
-                  : sessionTries >= 20
-                    ? "Limit Reached"
-                    : "New Card"}
-            </button>
-          </div>
+          <button onClick={resetStats} className="shrink-0 rounded-lg border border-[#e41c23] bg-[#e41c23] text-white px-5 py-2 text-xl font-bold shadow hover:bg-[#b71c1c] transition-colors">
+            New Game
+          </button>
+          <button
+            onClick={handleNewCard}
+            disabled={loading || cooldown > 0 || sessionTries >= 20 || (!!card && !card.solved) || tries >= 10}
+            className="shrink-0 rounded-lg bg-[#0057b8] text-white px-5 py-2 text-xl font-bold shadow hover:bg-[#003974] disabled:opacity-60 transition-colors"
+          >
+            {loading
+              ? "Loading…"
+              : cooldown > 0
+                ? `Wait ${cooldown}s`
+                : sessionTries >= 20
+                  ? "Limit Reached"
+                  : "New Card"}
+          </button>
         </div>
       </div>
 
       {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3">{error}</div>}
 
       {card && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow transition-shadow duration-300 hover:shadow-lg">
-          <div className={cx("p-3 rounded-t-2xl transition-colors duration-300", overlayClass(card.distance, card.solved))}>
-            {/* Side-by-side images */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:gap-6 items-center sm:items-start justify-center w-full">
-              <div className="flex-1 flex justify-center w-full">
-                <ImageWithMask src={card.frontUrl} alt={`${card.title} (front)`} solved={card.solved} onClick={() => setZoomUrl(card.frontUrl)} />
-              </div>
-              <div className="flex-1 flex justify-center w-full">
-                <ImageWithMask src={card.backUrl} alt={`${card.title} (back)`} solved={card.solved} onClick={() => setZoomUrl(card.backUrl)} />
-              </div>
-            </div>
-          </div>
-
-          <div className="px-3 pt-2 pb-3">
-            <div className="text-sm text-slate-700 mb-2 font-semibold tracking-wide" title={card.title}>{card.title}</div>
-
-            <div className="flex items-center gap-2">
-              <SelectGrade value={card.guessed} disabled={card.solved} onChange={(val) => onSelect(val)} />
-              <button
-                className={cx(
-                  "ml-auto rounded border border-slate-300 px-3 py-1.5 text-sm font-semibold transition-all duration-200",
-                  card.solved ? "bg-emerald-500 text-white" : "hover:bg-slate-50 disabled:opacity-60"
-                )}
-                onClick={onGuess}
-                disabled={card.solved || card.guessed == null}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow transition-shadow duration-300 hover:shadow-lg w-full max-w-3xl mx-auto flex flex-col sm:flex-row">
+          {/* Left: Card Images */}
+          <CardImagesSection card={card} overlayClass={overlayClass(card.distance, card.solved)} />
+          {/* Right: Card Details and Controls */}
+          <div className="flex-1 px-2 sm:px-3 pt-2 pb-3 flex flex-col gap-2 justify-center">
+            {card.solved && card.id && (
+              <a
+                href={`https://www.ebay.com/itm/${card.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mb-3 px-4 py-2 rounded bg-green-500 text-white text-xl font-bold hover:bg-green-800 transition-colors"
               >
-                Guess
-              </button>
-            </div>
+                View Listing on eBay
+              </a>
+            )}
+            <div className="text-lg text-slate-700 mb-2 font-semibold tracking-wide" title={card.title}>{card.title}</div>
+            <CardGuessControls
+              card={card}
+              priceHintUsed={priceHintUsed}
+              showPrice={showPrice}
+              onPriceHint={usePriceHint}
+              onSelect={onSelect}
+              onGuess={onGuess}
+            />
 
-            <div className="mt-2 text-xs min-h-[1.5em]">
+            <div className="mt-2 text-lg min-h-[1.5em]">
               {card.solved ? (
                 <span className="text-emerald-700 font-bold">Correct!</span>
               ) : card.distance != null ? (
                 <span className="text-rose-700">Guess Again!</span>
               ) : (
-                <span className="text-slate-500">Pick a grade and press Guess</span>
+                null
               )}
             </div>
 
@@ -201,16 +321,17 @@ export default function GamePage() {
               <div className="mt-4">
                 <button
                   onClick={load}
-                  className="w-full rounded bg-emerald-600 text-white py-2 font-semibold shadow hover:bg-emerald-700 transition-all duration-200"
-                  disabled={sessionTries >= 20}
+                  className="w-full rounded bg-emerald-600 text-white py-2 font-semibold shadow-md hover:bg-emerald-700 active:shadow-lg transition-all duration-200"
+                  disabled={sessionTries >= 20 || tries >= 10}
                 >
-                  {sessionTries >= 20 ? "Limit Reached" : "Next Card"}
+                  {sessionTries >= 20 ? "Limit Reached" : tries >= 10 ? "Try Limit" : "Next Card"}
                 </button>
               </div>
             )}
           </div>
         </div>
       )}
+
 
       {zoomUrl && (
         <ZoomModal src={zoomUrl} onClose={() => setZoomUrl(null)} />
@@ -245,6 +366,7 @@ function ZoomModal({ src, onClose }: { src: string; onClose: () => void }) {
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
     setDragging(true);
+// ...existing code...
     startRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
   };
 
@@ -279,7 +401,7 @@ function ZoomModal({ src, onClose }: { src: string; onClose: () => void }) {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute right-2 top-2 z-10 rounded-md bg-black/60 px-2 py-1 text-white text-xs hover:bg-black/80"
+          className="absolute right-2 top-2 z-10 rounded-md bg-black/60 px-2 py-1 text-white text-lg hover:bg-black/80"
         >
           Close (Esc)
         </button>
@@ -318,9 +440,7 @@ function ZoomModal({ src, onClose }: { src: string; onClose: () => void }) {
 
 /* --- UI Subcomponents --- */
 
-
-
-function ImageWithMask({ src, alt, solved, large, onClick }: { src: string; alt: string; solved?: boolean; large?: boolean; onClick?: () => void }) {
+function ImageWithMask({ src, alt, solved }: { src: string; alt: string; solved?: boolean }) {
   const [hovering, setHovering] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [touchScale, setTouchScale] = useState(1);
@@ -331,7 +451,7 @@ function ImageWithMask({ src, alt, solved, large, onClick }: { src: string; alt:
   const containerRef = useRef<HTMLDivElement>(null);
   const lastDist = useRef<number | null>(null);
   if (!src) return null;
-  const ZOOM = large ? 2.5 : 2.2; // zoom factor on hover
+  const ZOOM = 2.2; // zoom factor on hover (no large prop)
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -341,6 +461,8 @@ function ImageWithMask({ src, alt, solved, large, onClick }: { src: string; alt:
     const y = relY * 100;
     setPos({ x, y });
   }
+
+
 
   function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
     if (e.touches.length === 2) {
@@ -380,14 +502,13 @@ function ImageWithMask({ src, alt, solved, large, onClick }: { src: string; alt:
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200 touch-none cursor-pointer"
+      className="relative flex-1 rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200 touch-none cursor-default"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       onMouseMove={handleMouseMove}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onClick={onClick}
     >
       <img
         src={src}
@@ -418,26 +539,67 @@ function ImageWithMask({ src, alt, solved, large, onClick }: { src: string; alt:
   );
 }
 
-function SelectGrade({
-  value,
-  onChange,
-  disabled,
-}: {
-  value?: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}) {
+function SelectGrade({ value, onChange, disabled }: { value?: number; onChange: (v: number) => void; disabled?: boolean; }) {
+  const [open, setOpen] = useState(false);
+  const grades = Array.from({ length: 10 }, (_, i) => i + 1);
+  const selectRef = useRef<HTMLDivElement>(null);
+  const handleSelect = (g: number) => {
+    if (!disabled) {
+      onChange(g);
+      setOpen(false);
+    }
+  };
+  useEffect(() => {
+    if (!open) return;
+    function handle(e: MouseEvent) {
+      if (selectRef.current && !selectRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open]);
   return (
-    <select
-      className="rounded border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-60"
-      value={value ?? ""}
-      onChange={(e) => onChange(parseInt(e.target.value, 10))}
-      disabled={disabled}
-    >
-      <option value="" disabled>Grade…</option>
-      {Array.from({ length: 10 }, (_, i) => i + 1).map((g) => (
-        <option key={g} value={g}>{g}</option>
-      ))}
-    </select>
-  );
+    <div ref={selectRef} className="relative w-full select-none z-50" tabIndex={-1}>
+        {open && !disabled && (
+          <ul
+            className="absolute z-50 bottom-full mb-2 w-full rounded-lg border-2 border-[#0057b8] bg-white shadow-xl max-h-60 overflow-auto animate-fade-in"
+            role="listbox"
+          >
+            <li
+              className="px-5 py-3 text-xl text-slate-400 font-semibold cursor-default select-none text-center"
+            >Grade…</li>
+            {grades.map((g) => (
+              <li
+                key={g}
+                role="option"
+                aria-selected={value === g}
+                className={cx(
+                  "px-5 py-3 text-2xl font-bold cursor-pointer transition-colors text-center",
+                  value === g ? "bg-[#0057b8] text-white" : "text-[#0057b8] hover:bg-[#e6f0fa] hover:text-[#003974]"
+                )}
+                onClick={() => handleSelect(g)}
+                tabIndex={0}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && handleSelect(g)}
+              >
+                {g}
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          type="button"
+          className={cx(
+            "w-full flex items-center justify-center gap-2 rounded-lg border-2 border-[#0057b8] px-5 py-3 text-2xl font-bold bg-white text-[#0057b8] shadow-md transition-all focus:outline-none focus:ring-4 focus:ring-[#0057b8]/30 text-center",
+            disabled && "opacity-60 cursor-not-allowed"
+          )}
+          onClick={() => !disabled && setOpen((v) => !v)}
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          style={{ minWidth: 120 }}
+        >
+          <span className={cx("flex-1 text-center", !value && "text-slate-400 font-semibold text-xl")}>{value ?? "Grade…"}</span>
+          <span className="text-[#0057b8] text-2xl">▼</span>
+        </button>
+      </div>
+    );
 }
