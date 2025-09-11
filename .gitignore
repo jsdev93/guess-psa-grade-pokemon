@@ -31,3 +31,5 @@ dist/
 *.local
 *.sublime-workspace
 *.sublime-project
+
+eng.traineddata

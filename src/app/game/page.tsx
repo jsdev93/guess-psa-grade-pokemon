@@ -86,10 +86,10 @@ export default function GamePage() {
   useEffect(() => { load(); }, [load]);
 
   function overlayClass(distance?: number, solved?: boolean) {
-    if (solved) return "bg-emerald-400/25";
-    if (distance == null) return "";
-    if (distance <= 1) return "bg-amber-400/25";
-    return "bg-rose-400/25";
+  if (solved) return "bg-emerald-400/25";
+  if (distance == null) return "";
+  if (distance <= 1) return "bg-amber-400/25";
+  return "bg-rose-400/25";
   }
 
   function onSelect(value: number) {
@@ -119,16 +119,16 @@ export default function GamePage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-4">
+  <main className="mx-auto max-w-4xl p-4 min-h-screen">
       {/* Session stats */}
       <div className="mb-4 rounded-2xl border border-slate-200 bg-white shadow p-4">
         <h1 className="text-2xl font-semibold mb-2">PSA Pokémon Grade Guess</h1>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-1.5">
-            Session Solved: <b>{sessionSolved}</b>
+            Cards Solved: <b>{sessionSolved}</b>
           </span>
           <span className="rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 px-3 py-1.5">
-            Session Tries: <b>{sessionTries}</b>
+            Number of Tries: <b>{sessionTries}</b>
           </span>
           <span className="rounded-xl border border-slate-200 bg-slate-50 text-slate-800 px-3 py-1.5">
             This Card Tries: <b>{tries}</b>
@@ -139,14 +139,16 @@ export default function GamePage() {
             </button>
             <button
               onClick={handleNewCard}
-              disabled={loading || cooldown > 0}
+              disabled={loading || cooldown > 0 || sessionTries >= 20}
               className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm disabled:opacity-60"
             >
               {loading
                 ? "Loading…"
                 : cooldown > 0
                   ? `Wait ${cooldown}s`
-                  : "New Card"}
+                  : sessionTries >= 20
+                    ? "Limit Reached"
+                    : "New Card"}
             </button>
           </div>
         </div>
@@ -155,22 +157,29 @@ export default function GamePage() {
       {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3">{error}</div>}
 
       {card && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow">
-          <div className={cx("p-3 rounded-t-2xl transition-colors", overlayClass(card.distance, card.solved))}>
+        <div className="rounded-2xl border border-slate-200 bg-white shadow transition-shadow duration-300 hover:shadow-lg">
+          <div className={cx("p-3 rounded-t-2xl transition-colors duration-300", overlayClass(card.distance, card.solved))}>
             {/* Side-by-side images */}
-            <div className="flex gap-3">
-              <ImageWithMask src={card.frontUrl} alt={`${card.title} (front)`} onZoom={() => setZoomUrl(card.frontUrl)} />
-              <ImageWithMask src={card.backUrl} alt={`${card.title} (back)`} onZoom={() => setZoomUrl(card.backUrl)} />
+            <div className="flex flex-col gap-4 sm:flex-row sm:gap-6 items-center sm:items-start justify-center w-full">
+              <div className="flex-1 flex justify-center w-full">
+                <ImageWithMask src={card.frontUrl} alt={`${card.title} (front)`} solved={card.solved} onClick={() => setZoomUrl(card.frontUrl)} />
+              </div>
+              <div className="flex-1 flex justify-center w-full">
+                <ImageWithMask src={card.backUrl} alt={`${card.title} (back)`} solved={card.solved} onClick={() => setZoomUrl(card.backUrl)} />
+              </div>
             </div>
           </div>
 
           <div className="px-3 pt-2 pb-3">
-            <div className="text-sm text-slate-700 mb-2" title={card.title}>{card.title}</div>
+            <div className="text-sm text-slate-700 mb-2 font-semibold tracking-wide" title={card.title}>{card.title}</div>
 
             <div className="flex items-center gap-2">
               <SelectGrade value={card.guessed} disabled={card.solved} onChange={(val) => onSelect(val)} />
               <button
-                className="ml-auto rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-60"
+                className={cx(
+                  "ml-auto rounded border border-slate-300 px-3 py-1.5 text-sm font-semibold transition-all duration-200",
+                  card.solved ? "bg-emerald-500 text-white" : "hover:bg-slate-50 disabled:opacity-60"
+                )}
                 onClick={onGuess}
                 disabled={card.solved || card.guessed == null}
               >
@@ -178,12 +187,11 @@ export default function GamePage() {
               </button>
             </div>
 
-            <div className="mt-2 text-xs">
+            <div className="mt-2 text-xs min-h-[1.5em]">
               {card.solved ? (
-                <span className="text-emerald-700 font-medium">Correct!</span>
+                <span className="text-emerald-700 font-bold">Correct!</span>
               ) : card.distance != null ? (
-                card.distance <= 1 ? <span className="text-amber-700">Close (within 1)</span> :
-                  <span className="text-rose-700">Off by {card.distance}</span>
+                <span className="text-rose-700">Guess Again!</span>
               ) : (
                 <span className="text-slate-500">Pick a grade and press Guess</span>
               )}
@@ -191,8 +199,12 @@ export default function GamePage() {
 
             {card.solved && (
               <div className="mt-4">
-                <button onClick={load} className="w-full rounded bg-emerald-600 text-white py-2 hover:bg-emerald-700">
-                  Next Card
+                <button
+                  onClick={load}
+                  className="w-full rounded bg-emerald-600 text-white py-2 font-semibold shadow hover:bg-emerald-700 transition-all duration-200"
+                  disabled={sessionTries >= 20}
+                >
+                  {sessionTries >= 20 ? "Limit Reached" : "Next Card"}
                 </button>
               </div>
             )}
@@ -306,16 +318,102 @@ function ZoomModal({ src, onClose }: { src: string; onClose: () => void }) {
 
 /* --- UI Subcomponents --- */
 
-function ImageWithMask({ src, alt, onZoom }: { src: string; alt: string; onZoom: () => void }) {
+
+
+function ImageWithMask({ src, alt, solved, large, onClick }: { src: string; alt: string; solved?: boolean; large?: boolean; onClick?: () => void }) {
+  const [hovering, setHovering] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [touchScale, setTouchScale] = useState(1);
+  const [touchOrigin, setTouchOrigin] = useState({ x: 50, y: 50 });
+  const [touching, setTouching] = useState(false);
+  const lastScale = useRef(1);
+  const rafRef = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastDist = useRef<number | null>(null);
+  if (!src) return null;
+  const ZOOM = large ? 2.5 : 2.2; // zoom factor on hover
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const relY = (e.clientY - rect.top) / rect.height;
+    if (relY < 0.25) return; // Prevent pan in top 25%
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = relY * 100;
+    setPos({ x, y });
+  }
+
+  function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (e.touches.length === 2) {
+      setTouching(true);
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left) / rect.width * 100;
+      const y = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top) / rect.height * 100;
+      setTouchOrigin({ x, y });
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastDist.current = Math.sqrt(dx * dx + dy * dy);
+      lastScale.current = touchScale;
+    }
+  }
+  function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (e.touches.length === 2 && lastDist.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      let scale = (dist / lastDist.current) * lastScale.current;
+      scale = Math.max(1, Math.min(scale, 3)); // Clamp scale between 1x and 3x
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => setTouchScale(scale));
+      e.preventDefault();
+    }
+  }
+  function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    if (e.touches.length < 2) {
+      setTouching(false);
+      setTouchScale(1);
+      lastDist.current = null;
+      lastScale.current = 1;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    }
+  }
   return (
-    <div className="relative flex-1 rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200">
+    <div
+      ref={containerRef}
+      className="relative flex-1 rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200 touch-none cursor-pointer"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      onMouseMove={handleMouseMove}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onClick={onClick}
+    >
       <img
         src={src}
         alt={alt}
-        className="w-full h-auto cursor-zoom-in transition-transform duration-200 hover:scale-[1.01]"
-        onClick={onZoom}
+        draggable={false}
+        className="select-none w-full h-full object-contain transition-transform duration-300"
+        style={
+          touching
+            ? {
+                transform: `scale(${touchScale})`,
+                transformOrigin: `${touchOrigin.x}% ${touchOrigin.y}%`,
+                zIndex: 2,
+              }
+            : hovering
+            ? {
+                transform: `scale(${ZOOM})`,
+                transformOrigin: `${pos.x}% ${pos.y}%`,
+                zIndex: 2,
+              }
+            : {}
+        }
       />
-      <div className="pointer-events-none absolute left-0 right-0 top-0 h-[18%] bg-black/100" title="Label hidden" />
+      {/* Hide black overlay if solved */}
+      {!solved && (
+        <div className="pointer-events-none absolute left-0 right-0 top-0 h-[20%] bg-black/100" title="Label hidden" />
+      )}
     </div>
   );
 }
