@@ -66,7 +66,7 @@ function CardImagesSection({ card, overlayClass, zoomIntensity }: CardImagesSect
           <button
             aria-label={showFront ? "Show back of card" : "Show front of card"}
             onClick={handleToggle}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 border-2 border-[#f4e37f] bg-[#6a7678] rounded-full shadow-[0_0_8px_#f4e37f] p-2 w-12 h-12 flex items-center justify-center hover:bg-[#f4e37f] hover:text-[#6a7678] focus:outline-none focus:ring-2 focus:ring-[#f4e37f] transition-all duration-150"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 border-2 bg-[#6a7678] rounded-full shadow-[0_0_8px_#f4e37f] p-2 w-12 h-12 flex items-center justify-center hover:bg-[#f4e37f] hover:text-[#6a7678] focus:outline-none focus:ring-2 focus:ring-[#f4e37f] transition-all duration-150"
             style={{ left: 0 }}
           >
             <span className="text-3xl text-white font-extrabold drop-shadow">&#8592;</span>
@@ -247,7 +247,7 @@ export default function GamePage() {
 
   return (
   <main
-    className="mx-auto max-w-5xl p-2 sm:p-4 md:p-6 min-h-screen font-sans flex flex-col items-center justify-start bg-[url(/pkmbg.jpg)] bg-repeat text-white"
+    className="mx-auto max-w-5xl min-h-screen font-sans flex flex-col items-center justify-start bg-[url(/pkmbg.jpg)] bg-repeat text-white"
     style={{
       fontFamily: 'Roboto, Arial, Helvetica, "Segoe UI", sans-serif',
       color: '#fff',
@@ -258,35 +258,8 @@ export default function GamePage() {
   >
       {/* Session stats */}
   <div className="mb-4 sm:mb-6 rounded-2xl border-4 border-[#8e9388] bg-[#f4e37f] shadow-[0_0_24px_#8e9388] p-3 sm:p-4 md:p-6 w-full max-w-3xl mx-auto text-white">
-  <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2 sm:mb-4 tracking-tight text-white text-center drop-shadow-[0_0_10px_#f4e37f]">PSA Pokémon Grade Guess</h1>
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-base sm:text-xl">
-          <span className="shrink-0 rounded-xl border-2 border-[#8e9388] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#8e9388]">
-            Cards Solved: <b>{sessionSolved}</b>
-          </span>
-          <span className="shrink-0 rounded-xl border-2 border-[#f4e37f] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#f4e37f]">
-            Number of Tries: <b>{sessionTries}</b>
-          </span>
-          <span className="shrink-0 rounded-xl border-2 border-[#6a7678] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#6a7678]">
-            This Card Tries: <b>{tries}</b>
-          </span>
-          <button onClick={resetStatsAndNewGame} className="shrink-0 rounded-lg border-2 border-[#b1a886] bg-[#f4e37f] text-[#6a7678] px-5 py-2 text-xl font-bold shadow-[0_0_8px_#b1a886] hover:bg-[#b1a886] hover:text-white transition-colors">
-            New Game
-          </button>
-          <button
-            onClick={handleNewCard}
-            disabled={loading || cooldown > 0 || sessionTries >= 10 || (!!card && !card.solved) || tries >= 10}
-            className="shrink-0 rounded-lg border-2 border-[#f4e37f] bg-[#8e9388] text-white px-5 py-2 text-xl font-bold shadow-[0_0_8px_#f4e37f] hover:bg-[#e2f4f8] hover:text-[#6a7678] disabled:opacity-60 transition-colors"
-          >
-            {loading
-              ? "Loading…"
-              : cooldown > 0
-                ? `Wait ${cooldown}s`
-                : sessionTries >= 10
-                  ? "Limit Reached"
-                  : "New Card"}
-          </button>
-        </div>
-      </div>
+    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2 sm:mb-4 tracking-tight text-[#e2f4f8] text-center drop-shadow-[0_0_10px_#f4e37f]">PSA Pokémon Grade Guess</h1>
+  </div>
 
       {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3">{error}</div>}
 
@@ -308,6 +281,37 @@ export default function GamePage() {
               </a>
             )}
             <div className="text-lg text-[#6a7678] mb-2 font-semibold tracking-wide" title={card.title}>{card.title}</div>
+            {/* Counters */}
+            <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-base sm:text-xl">
+              <span className="shrink-0 rounded-xl border-2 border-[#8e9388] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#8e9388]">
+                Cards Solved: <b>{sessionSolved}</b>
+              </span>
+              <span className="shrink-0 rounded-xl border-2 border-[#f4e37f] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#f4e37f]">
+                Number of Tries: <b>{sessionTries}</b>
+              </span>
+              <span className="shrink-0 rounded-xl border-2 border-[#6a7678] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#6a7678]">
+                This Card Tries: <b>{tries}</b>
+              </span>
+            </div>
+            {/* New Game and New Card buttons */}
+            <div className="mb-2 flex gap-3 w-full flex-col items-center text-center sm:w-auto sm:flex-row sm:items-center sm:justify-start">
+              <button onClick={resetStatsAndNewGame} className="rounded-lg border-2 border-[#b1a886] bg-[#f4e37f] text-[#6a7678] px-5 py-2 text-xl font-bold shadow-[0_0_8px_#b1a886] hover:bg-[#b1a886] hover:text-white transition-colors">
+                New Game
+              </button>
+              <button
+                onClick={handleNewCard}
+                disabled={loading || cooldown > 0 || sessionTries >= 10 || (!!card && !card.solved) || tries >= 10}
+                className="rounded-lg border-2 border-[#f4e37f] bg-[#8e9388] text-white px-5 py-2 text-xl font-bold shadow-[0_0_8px_#f4e37f] hover:bg-[#e2f4f8] hover:text-[#6a7678] disabled:opacity-60 transition-colors"
+              >
+                {loading
+                  ? "Loading…"
+                  : cooldown > 0
+                    ? `Wait ${cooldown}s`
+                    : sessionTries >= 10
+                      ? "Limit Reached"
+                      : "New Card"}
+              </button>
+            </div>
             {/* Zoom intensity slider */}
             <div className="mb-2 flex gap-3 w-full flex-col items-center text-center sm:w-auto sm:flex-row sm:items-center sm:justify-start">
               <label htmlFor="zoom-slider" className="text-[#b1a886] font-semibold">Zoom Intensity</label>
