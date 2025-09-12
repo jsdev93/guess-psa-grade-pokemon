@@ -492,6 +492,15 @@ function ImageWithMask({ src, alt, solved }: { src: string; alt: string; solved?
       scale = Math.max(1, Math.min(scale, 3)); // Clamp scale between 1x and 3x
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => setTouchScale(scale));
+      // If user zooms out to 1x, reset pan/zoom state immediately
+      if (scale === 1) {
+        setTouchScale(1);
+        setOffset({ x: 0, y: 0 });
+        setLastPan(null);
+        setTouching(false);
+        lastDist.current = null;
+        lastScale.current = 1;
+      }
       e.preventDefault();
     } else if (e.touches.length === 1 && lastPan && touchScale > 1) {
       // Drag/pan
