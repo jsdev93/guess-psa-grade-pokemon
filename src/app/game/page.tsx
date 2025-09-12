@@ -440,12 +440,15 @@ function ZoomModal({ src, onClose }: { src: string; onClose: () => void }) {
 
 /* --- UI Subcomponents --- */
 
+
 function ImageWithMask({ src, alt, solved }: { src: string; alt: string; solved?: boolean }) {
   const [hovering, setHovering] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [touchScale, setTouchScale] = useState(1);
   const [touchOrigin, setTouchOrigin] = useState({ x: 50, y: 50 });
   const [touching, setTouching] = useState(false);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [lastPan, setLastPan] = useState<{ x: number; y: number } | null>(null);
   const lastScale = useRef(1);
   const rafRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -462,8 +465,6 @@ function ImageWithMask({ src, alt, solved }: { src: string; alt: string; solved?
     setPos({ x, y });
   }
 
-
-
   function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
     if (e.touches.length === 2) {
       setTouching(true);
@@ -476,10 +477,14 @@ function ImageWithMask({ src, alt, solved }: { src: string; alt: string; solved?
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastDist.current = Math.sqrt(dx * dx + dy * dy);
       lastScale.current = touchScale;
+      setLastPan(null);
+    } else if (e.touches.length === 1 && touchScale > 1) {
+      setLastPan({ x: e.touches[0].clientX - offset.x, y: e.touches[0].clientY - offset.y });
     }
   }
   function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
     if (e.touches.length === 2 && lastDist.current) {
+      // Pinch zoom
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -488,12 +493,20 @@ function ImageWithMask({ src, alt, solved }: { src: string; alt: string; solved?
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => setTouchScale(scale));
       e.preventDefault();
+    } else if (e.touches.length === 1 && lastPan && touchScale > 1) {
+      // Drag/pan
+      const x = e.touches[0].clientX - lastPan.x;
+      const y = e.touches[0].clientY - lastPan.y;
+      setOffset({ x, y });
+      e.preventDefault();
     }
   }
   function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
     if (e.touches.length < 2) {
       setTouching(false);
       setTouchScale(1);
+      setOffset({ x: 0, y: 0 });
+      setLastPan(null);
       lastDist.current = null;
       lastScale.current = 1;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -516,9 +529,9 @@ function ImageWithMask({ src, alt, solved }: { src: string; alt: string; solved?
         draggable={false}
         className="select-none w-full h-full object-contain transition-transform duration-300"
         style={
-          touching
+          touching || touchScale > 1
             ? {
-                transform: `scale(${touchScale})`,
+                transform: `scale(${touchScale}) translate(${offset.x / touchScale}px, ${offset.y / touchScale}px)` ,
                 transformOrigin: `${touchOrigin.x}% ${touchOrigin.y}%`,
                 zIndex: 2,
               }
