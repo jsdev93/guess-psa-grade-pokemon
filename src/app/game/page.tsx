@@ -123,7 +123,7 @@ function cx(...a: (string | false | null | undefined)[]) {
 
 export default function GamePage() {
   // Zoom intensity state (default 2.2)
-  const [zoomIntensity, setZoomIntensity] = useState(2.5);
+  const [zoomIntensity, setZoomIntensity] = useState(3);
   const [showPrice, setShowPrice] = useState(false);
   const [priceHintUsed, setPriceHintUsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -258,7 +258,7 @@ export default function GamePage() {
   >
       {/* Session stats */}
   <div className="mb-4 sm:mb-6 rounded-2xl border-4 border-[#8e9388] bg-[#f4e37f] shadow-[0_0_24px_#8e9388] p-3 sm:p-4 md:p-6 w-full max-w-3xl mx-auto text-white">
-    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2 sm:mb-4 tracking-tight text-[#e2f4f8] text-center drop-shadow-[0_0_10px_#f4e37f]">PSA Pokémon Grade Guess</h1>
+    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2 sm:mb-4 tracking-tight text-[#e2f4f8] text-center drop-shadow-[0_0_10px_#f4e37f]">Pokémon PSA SlabGuessr</h1>
   </div>
 
       {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3">{error}</div>}
