@@ -44,7 +44,7 @@ function CardGuessControls({ card, priceHintUsed, showPrice, onPriceHint, onSele
 // CardImageCard: visually distinct card for the image/toggle UI
 function CardImageCard({ children }: { children: React.ReactNode }) {
   return (
-  <div className="bg-[#e2f4f8] rounded-2xl border-2 border-[#6a7678] shadow-[0_0_16px_#6a7678] p-4 sm:p-6 m-2 sm:m-4 flex flex-col items-center justify-center text-white">
+  <div className="w-[30rem] !important bg-[#e2f4f8] rounded-2xl border-2 border-[#6a7678] shadow-[0_0_16px_#6a7678] p-4 sm:p-6 m-2 sm:m-4 flex flex-col items-center justify-center text-white">
       {children}
     </div>
   );
@@ -123,7 +123,7 @@ function cx(...a: (string | false | null | undefined)[]) {
 
 export default function GamePage() {
   // Zoom intensity state (default 2.2)
-  const [zoomIntensity, setZoomIntensity] = useState(3);
+  const [zoomIntensity, setZoomIntensity] = useState(2);
   const [showPrice, setShowPrice] = useState(false);
   const [priceHintUsed, setPriceHintUsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -597,7 +597,7 @@ function ImageWithMask({ src, alt, solved, zoomIntensity = 2.2 }: { src: string;
 
 function SelectGrade({ value, onChange, disabled }: { value?: number; onChange: (v: number) => void; disabled?: boolean; }) {
   const [open, setOpen] = useState(false);
-  const grades = Array.from({ length: 10 }, (_, i) => i + 1);
+  const grades = Array.from({ length: 10 }, (_, i) => 10 - i);
   const selectRef = useRef<HTMLDivElement>(null);
   const handleSelect = (g: number) => {
     if (!disabled) {
