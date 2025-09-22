@@ -257,7 +257,7 @@ export default function GamePage() {
     }}
   >
       {/* Session stats */}
-  <div className="mb-4 sm:mb-6 rounded-2xl border-4 border-[#8e9388] bg-[#f4e37f] shadow-[0_0_24px_#8e9388] p-3 sm:p-4 md:p-6 w-full max-w-3xl mx-auto text-white">
+  <div className="mb-4 mt-16 sm:mb-6 rounded-2xl border-4 border-[#8e9388] bg-[#f4e37f] shadow-[0_0_24px_#8e9388] p-3 sm:p-4 md:p-6 w-full max-w-3xl mx-auto text-white">
     <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2 sm:mb-4 tracking-tight text-[#e2f4f8] text-center drop-shadow-[0_0_10px_#f4e37f]">Pokémon PSA SlabGuessr</h1>
   </div>
 
