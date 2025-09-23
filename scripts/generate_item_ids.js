@@ -4,8 +4,8 @@ import puppeteer from 'puppeteer';
 import fs from 'fs';
 
 
-const EBAY_URL = Array.from({ length: 21 }, (_, i) =>
-  `https://www.ebay.com/sch/183454/i.html?%5C_dkr=1&_fsrp=1&_blrs=recall%5C_filtering&_ssn=psa&_ipg=240&iconV2Request=true&store%5C_name=psa&_sop=10&_oac=1&Grade=1%7C2%7C3%7C4%7C5%7C6%7C7%7C8%7C9%7C10&_dmd=1&Professional%2520Grader=Professional%2520Sports%2520Authenticator%2520%2528PSA%2529&Game=Pok%25C3%25A9mon%2520TCG&_dcat=183454&LH_BIN=1&_pgn=${i+10}&rt=nc`
+const EBAY_URL = Array.from({ length: 30 }, (_, i) =>
+  `https://www.ebay.com/sch/183454/i.html?%5C_dkr=1&_fsrp=1&_blrs=recall%5C_filtering&_ssn=psa&_ipg=240&iconV2Request=true&store%5C_name=psa&_sop=10&_oac=1&Grade=1%7C2%7C3%7C4%7C5%7C6%7C7%7C8%7C9%7C10&_dmd=1&Professional%2520Grader=Professional%2520Sports%2520Authenticator%2520%2528PSA%2529&Game=Pok%25C3%25A9mon%2520TCG&_dcat=183454&LH_BIN=1&_pgn=${i}&rt=nc`
 );
 
 async function refreshItemIds() {

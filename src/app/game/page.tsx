@@ -1,4 +1,7 @@
 "use client";
+
+import "./nudge.css";
+
 // CardGuessControls: handles price hint, grade select, and guess button
 type CardGuessControlsProps = {
   card: GameItem;
@@ -44,7 +47,9 @@ function CardGuessControls({ card, priceHintUsed, showPrice, onPriceHint, onSele
 // CardImageCard: visually distinct card for the image/toggle UI
 function CardImageCard({ children }: { children: React.ReactNode }) {
   return (
-  <div className="w-[30rem] !important bg-[#e2f4f8] rounded-2xl border-2 border-[#6a7678] shadow-[0_0_16px_#6a7678] p-4 sm:p-6 m-2 sm:m-4 flex flex-col items-center justify-center text-white">
+    <div className="w-[40rem] !important bg-[#e2f4f8] rounded-2xl border-2 border-[#6a7678] shadow-[0_0_16px_#6a7678] p-4 sm:p-6 m-2 sm:m-4 flex flex-col items-center justify-center text-white"
+      style={{ minWidth: "20rem", minHeight: "28rem" }} // add minWidth/minHeight for layout stability
+    >
       {children}
     </div>
   );
@@ -60,7 +65,13 @@ function CardImagesSection({ card, overlayClass, zoomIntensity }: CardImagesSect
   const [showFront, setShowFront] = useState(true);
   const handleToggle = () => setShowFront((v) => !v);
   return (
-  <div className={cx("transition-colors duration-300 flex flex-col items-center justify-center bg-[#e2f4f8] border-2 border-[#f4e37f] shadow-[0_0_12px_#f4e37f] text-white", overlayClass)} style={{ minWidth: 0 }}>
+    <div
+      className={cx(
+        "transition-colors duration-300 flex flex-col items-center justify-center border-2 border-[#f4e37f] shadow-[0_0_12px_#f4e37f] text-white",
+        overlayClass
+      )}
+      style={{ minWidth: 0, minHeight: "28rem" }} // ensure enough height for image card
+    >
       <CardImageCard>
         <div className="relative flex flex-col items-center justify-center w-full sm:max-w-xs md:max-w-2xl">
           <button
@@ -97,6 +108,7 @@ function CardImagesSection({ card, overlayClass, zoomIntensity }: CardImagesSect
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState, useRef } from "react";
+import confetti from "canvas-confetti";
 
 type CardItem = {
   title: string;
@@ -146,7 +158,8 @@ export default function GamePage() {
 
   const [cooldown, setCooldown] = useState(0);
   const gameOver = tries >= 10;
-  // ...existing code...
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [nudge, setNudge] = useState(false);
   // tick down the cooldown once per second
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -180,7 +193,6 @@ export default function GamePage() {
 
     try {
       const r = await fetch("/api/random-pokemon?count=1", { cache: "no-store" });
-  // ...existing code...
       const ct = r.headers.get("content-type") || "";
       if (!ct.includes("application/json")) throw new Error("Non-JSON response");
       const data = await r.json();
@@ -197,10 +209,8 @@ export default function GamePage() {
   useEffect(() => { load(); }, [load]);
 
   function overlayClass(distance?: number, solved?: boolean) {
-  if (solved) return "bg-emerald-400/25";
-  if (distance == null) return "";
-  if (distance <= 1) return "bg-amber-400/25";
-  return "bg-rose-400/25";
+  // Remove background color classes for solved/yellow/red
+  return "";
   }
 
   function onSelect(value: number) {
@@ -219,7 +229,19 @@ export default function GamePage() {
     const next = { ...card, distance: dist, solved: solved || card.solved };
     setCard(next);
 
-    if (solved && !card.solved) setSessionSolved((s) => s + 1);
+    if (solved && !card.solved) {
+      setSessionSolved((s) => s + 1);
+      setShowCongrats(true);
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+      setTimeout(() => setShowCongrats(false), 2200); // Hide after 2.2s
+    } else if (!solved) {
+      setNudge(true);
+      setTimeout(() => setNudge(false), 600); // duration of nudge animation
+    }
   }
 
   function resetStatsAndNewGame() {
@@ -264,7 +286,7 @@ export default function GamePage() {
       {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3">{error}</div>}
 
       {card && (
-  <div className="rounded-2xl border-2 border-[#b1a886] bg-[#f4e37f] shadow transition-shadow duration-300 hover:shadow-lg w-full max-w-3xl mx-auto flex flex-col sm:flex-row">
+  <div className="rounded-2xl border-2 border-[#b1a886] bg-[#f4e37f] shadow transition-shadow duration-300 hover:shadow-lg w-full max-w-5xl mx-auto flex flex-col sm:flex-row flex-wrap">
           {/* Left: Card Images */}
           <CardImagesSection card={card} overlayClass={overlayClass(card.distance, card.solved)} zoomIntensity={zoomIntensity} />
           {/* Right: Card Details and Controls */}
@@ -282,14 +304,14 @@ export default function GamePage() {
             )}
             <div className="text-lg text-[#6a7678] mb-2 font-semibold tracking-wide" title={card.title}>{card.title}</div>
             {/* Counters */}
-            <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-base sm:text-xl">
-              <span className="shrink-0 rounded-xl border-2 border-[#8e9388] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#8e9388]">
+            <div className="mb-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-base sm:text-xl">
+              <span className="shrink-0 rounded-xl border-2 border-[#8e9388] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#8e9388]">
                 Cards Solved: <b>{sessionSolved}</b>
               </span>
-              <span className="shrink-0 rounded-xl border-2 border-[#f4e37f] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#f4e37f]">
+              <span className="shrink-0 rounded-xl border-2 border-[#f4e37f] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#f4e37f]">
                 Number of Tries: <b>{sessionTries}</b>
               </span>
-              <span className="shrink-0 rounded-xl border-2 border-[#6a7678] bg-[#e2f4f8] text-[#6a7678] px-4 py-2 font-bold shadow-[0_0_8px_#6a7678]">
+              <span className="shrink-0 rounded-xl border-2 border-[#6a7678] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#6a7678]">
                 This Card Tries: <b>{tries}</b>
               </span>
             </div>
@@ -299,8 +321,14 @@ export default function GamePage() {
                 New Game
               </button>
               <button
-                onClick={handleNewCard}
-                disabled={loading || cooldown > 0 || sessionTries >= 10 || (!!card && !card.solved) || tries >= 10}
+                onClick={sessionTries >= 10 ? undefined : handleNewCard}
+                disabled={
+                  loading ||
+                  cooldown > 0 ||
+                  sessionTries >= 10 ||
+                  (!!card && !card.solved) ||
+                  tries >= 10
+                }
                 className="rounded-lg border-2 border-[#f4e37f] bg-[#8e9388] text-white px-5 py-2 text-xl font-bold shadow-[0_0_8px_#f4e37f] hover:bg-[#e2f4f8] hover:text-[#6a7678] disabled:opacity-60 transition-colors"
               >
                 {loading
@@ -327,19 +355,28 @@ export default function GamePage() {
               />
               <span className="font-mono text-[#b1a886]">{zoomIntensity.toFixed(2)}x</span>
             </div>
-            <CardGuessControls
-              card={card}
-              priceHintUsed={priceHintUsed}
-              showPrice={showPrice}
-              onPriceHint={usePriceHint}
-              onSelect={onSelect}
-              onGuess={onGuess}
-              disabled={gameOver}
-            />
+            {/* Controls with nudge animation */}
+            <div className={nudge ? "animate-nudge" : ""}>
+              <CardGuessControls
+                card={card}
+                priceHintUsed={priceHintUsed}
+                showPrice={showPrice}
+                onPriceHint={usePriceHint}
+                onSelect={onSelect}
+                onGuess={onGuess}
+                disabled={gameOver}
+              />
+            </div>
 
             <div className="mt-2 text-lg min-h-[1.5em]">
               {gameOver ? (
                 <span className="text-[#6a7678] font-bold">Game Over! Out of tries.</span>
+              ) : showCongrats ? (
+                <span className="font-extrabold text-3xl text-[#f4e37f] drop-shadow-[0_0_12px_#b1a886] animate-bounce">
+                  🎉 Congratulations! 🎉
+                </span>
+              ) : nudge ? (
+                <span className="font-extrabold text-xl text-[#f4e37f] animate-pulse">Guess Again!</span>
               ) : card.solved ? (
                 <span className="text-[#b1a886] font-bold">Correct!</span>
               ) : card.distance != null ? (
@@ -398,7 +435,6 @@ function ZoomModal({ src, onClose }: { src: string; onClose: () => void }) {
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
     setDragging(true);
-// ...existing code...
     startRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
   };
 
@@ -619,6 +655,7 @@ function SelectGrade({ value, onChange, disabled }: { value?: number; onChange: 
           <ul
             className="absolute z-50 bottom-full mb-2 w-full rounded-lg border-2 border-[#8e9388] bg-[#f4e37f] shadow-[0_0_12px_#8e9388] max-h-60 overflow-auto animate-fade-in text-white"
             role="listbox"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }} // hide scrollbar Firefox/IE
           >
             <li
               className="px-5 py-3 text-xl text-[#6a7678] font-semibold cursor-default select-none text-center drop-shadow-[0_0_4px_#f4e37f]"
