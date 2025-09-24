@@ -48,7 +48,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ### 1. Generate eBay Item IDs
 
-Fetches a list of eBay item IDs for PSA Pokémon cards:
+Fetches a list of eBay item IDs for PSA Pokémon cards: (delete item-ids.json)
 
 ```bash
 node scripts/generate_item_ids.js
@@ -74,7 +74,7 @@ Scrape 5K eBay items and save to a JSON file (run this every 3 months as eBay wi
 node scripts/ml/bulk_scrape_to_json.js scripts/item-ids.json scripts/ml/output.json
 ```
 
-Each entry: `{ id, grade, imgUrlFront, imgUrlBack, price }`
+Each entry: `{ id, grade, imgUrlFront, imgUrlBack, price, certNumber }`
 
 ### 4. Filter Out Invalid Entries
 
@@ -86,7 +86,7 @@ node scripts/filter_output.js
 
 Creates `scripts/ml/output.filtered.json` containing only valid graded entries.
 
-### 4. Download Images by Grade (for ML, ignore mostly)
+<!-- ### 4. Download Images by Grade (for ML, ignore mostly)
 
 Download all images from a JSON dataset, organized by grade:
 
@@ -94,7 +94,7 @@ Download all images from a JSON dataset, organized by grade:
 python3 scripts/download_images_by_grade.py output.json dataset/
 ```
 
-Images are saved as `dataset/<grade>/<id>_imgUrlFront_...` and `dataset/<grade>/<id>_imgUrlBack_...`
+Images are saved as `dataset/<grade>/<id>_imgUrlFront_...` and `dataset/<grade>/<id>_imgUrlBack_...` -->
 
 ## Game & API
 

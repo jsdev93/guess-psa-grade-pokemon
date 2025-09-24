@@ -1,6 +1,32 @@
 "use client";
 
 import "./nudge.css";
+import { useCallback, useEffect, useState, useRef } from "react";
+import confetti from "canvas-confetti";
+
+/* eslint-disable @next/next/no-img-element */
+
+type CardItem = {
+  title: string;
+  grade: number;     // hidden from user
+  frontUrl: string;
+  backUrl: string;
+  price?: string | null;
+  id?: string | number;
+};
+
+type GameItem = CardItem & {
+  guessed?: number;
+  solved?: boolean;
+  distance?: number;
+};
+
+const LS_SOLVED = "psa_session_solved";
+const LS_TRIES = "psa_session_tries";
+
+function cx(...a: (string | false | null | undefined)[]) {
+  return a.filter(Boolean).join(" ");
+}
 
 // CardGuessControls: handles price hint, grade select, and guess button
 type CardGuessControlsProps = {
@@ -12,7 +38,15 @@ type CardGuessControlsProps = {
   onGuess: () => void;
   disabled?: boolean;
 };
-function CardGuessControls({ card, priceHintUsed, showPrice, onPriceHint, onSelect, onGuess, disabled }: CardGuessControlsProps) {
+function CardGuessControls({
+  card,
+  priceHintUsed,
+  showPrice,
+  onPriceHint,
+  onSelect,
+  onGuess,
+  disabled,
+}: CardGuessControlsProps) {
   return (
   <div className="bg-[#e2f4f8] rounded-2xl border-2 border-[#8e9388] shadow-[0_0_16px_#8e9388] p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 my-2 text-white">
       {card.price && !priceHintUsed && !showPrice && (
@@ -105,33 +139,6 @@ function CardImagesSection({ card, overlayClass, zoomIntensity }: CardImagesSect
     </div>
   );
 }
-/* eslint-disable @next/next/no-img-element */
-
-import { useCallback, useEffect, useState, useRef } from "react";
-import confetti from "canvas-confetti";
-
-type CardItem = {
-  title: string;
-  grade: number;     // hidden from user
-  frontUrl: string;
-  backUrl: string;
-  price?: string | null;
-  id?: string | number;
-};
-
-type GameItem = CardItem & {
-  guessed?: number;
-  solved?: boolean;
-  distance?: number;
-};
-
-const LS_SOLVED = "psa_session_solved";
-const LS_TRIES = "psa_session_tries";
-
-function cx(...a: (string | false | null | undefined)[]) {
-  return a.filter(Boolean).join(" ");
-}
-
 
 export default function GamePage() {
   // Zoom intensity state (default 2.2)
@@ -272,10 +279,10 @@ export default function GamePage() {
     className="mx-auto max-w-5xl min-h-screen font-sans flex flex-col items-center justify-start bg-[url(/pkmbg.jpg)] bg-repeat text-white"
     style={{
       fontFamily: 'Roboto, Arial, Helvetica, "Segoe UI", sans-serif',
-      color: '#fff',
-      minHeight: '100dvh',
-      boxSizing: 'border-box',
-      textShadow: '0 0 8px #f4e37f, 0 0 16px #8e9388',
+      color: "#fff",
+      minHeight: "100dvh",
+      boxSizing: "border-box",
+      textShadow: "0 0 8px #f4e37f, 0 0 16px #8e9388",
     }}
   >
       {/* Session stats */}
@@ -304,17 +311,7 @@ export default function GamePage() {
             )}
             <div className="text-lg text-[#6a7678] mb-2 font-semibold tracking-wide" title={card.title}>{card.title}</div>
             {/* Counters */}
-            <div className="mb-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-base sm:text-xl">
-              <span className="shrink-0 rounded-xl border-2 border-[#8e9388] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#8e9388]">
-                Cards Solved: <b>{sessionSolved}</b>
-              </span>
-              <span className="shrink-0 rounded-xl border-2 border-[#f4e37f] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#f4e37f]">
-                Number of Tries: <b>{sessionTries}</b>
-              </span>
-              <span className="shrink-0 rounded-xl border-2 border-[#6a7678] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#6a7678]">
-                This Card Tries: <b>{tries}</b>
-              </span>
-            </div>
+            <CounterStats sessionSolved={sessionSolved} sessionTries={sessionTries} tries={tries} />
             {/* New Game and New Card buttons */}
             <div className="mb-2 flex gap-3 w-full flex-col items-center text-center sm:w-auto sm:flex-row sm:items-center sm:justify-start">
               <button onClick={resetStatsAndNewGame} className="rounded-lg border-2 border-[#b1a886] bg-[#f4e37f] text-[#6a7678] px-5 py-2 text-xl font-bold shadow-[0_0_8px_#b1a886] hover:bg-[#b1a886] hover:text-white transition-colors">
@@ -695,4 +692,21 @@ function SelectGrade({ value, onChange, disabled }: { value?: number; onChange: 
         </button>
       </div>
     );
+}
+
+// Refactor: Extract CounterStats to a separate component for clarity
+function CounterStats({ sessionSolved, sessionTries, tries }: { sessionSolved: number; sessionTries: number; tries: number }) {
+  return (
+    <div className="mb-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-base sm:text-xl">
+      <span className="shrink-0 rounded-xl border-2 border-[#8e9388] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#8e9388]">
+        Cards Solved: <b>{sessionSolved}</b>
+      </span>
+      <span className="shrink-0 rounded-xl border-2 border-[#f4e37f] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#f4e37f]">
+        Number of Tries: <b>{sessionTries}</b>
+      </span>
+      <span className="shrink-0 rounded-xl border-2 border-[#6a7678] bg-[#e2f4f8] text-[#6a7678] px-6 py-3 font-bold shadow-[0_0_8px_#6a7678]">
+        This Card Tries: <b>{tries}</b>
+      </span>
+    </div>
+  );
 }

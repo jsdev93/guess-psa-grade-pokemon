@@ -11,7 +11,10 @@ const outputPath = path.join(__dirname, "ml", "output.filtered.json");
 const data = JSON.parse(fs.readFileSync(inputPath, "utf8"));
 
 const filtered = data.filter(
-  (item) => typeof item.grade === "number" && !isNaN(item.grade)
+  (item) =>
+    typeof item.grade === "number" &&
+    !isNaN(item.grade) &&
+    Number(item.certNumber) >= 90000000
 );
 
 fs.writeFileSync(outputPath, JSON.stringify(filtered, null, 2));
