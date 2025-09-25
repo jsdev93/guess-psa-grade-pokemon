@@ -280,9 +280,10 @@ export default function GamePage() {
     style={{
       fontFamily: 'Roboto, Arial, Helvetica, "Segoe UI", sans-serif',
       color: "#fff",
-      minHeight: "100dvh",
       boxSizing: "border-box",
       textShadow: "0 0 8px #f4e37f, 0 0 16px #8e9388",
+      transform: "scale(0.75)",
+      transformOrigin: "top center",
     }}
   >
 
