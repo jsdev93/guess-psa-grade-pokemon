@@ -21,6 +21,43 @@ from pathlib import Path
 import argparse
 
 
+class PSA910FocusedLoss(nn.Module):
+    """Custom loss that heavily penalizes PSA 9/10 misclassification for gem mint detection"""
+    
+    def __init__(self, class_weights, grade_9_10_penalty=50.0, non_gem_penalty=10.0):
+        super().__init__()
+        self.class_weights = class_weights
+        self.grade_9_10_penalty = grade_9_10_penalty  # Heavy penalty for 9<->10 confusion
+        self.non_gem_penalty = non_gem_penalty        # Penalty for missing gem mint cards
+        self.base_criterion = nn.CrossEntropyLoss(weight=class_weights, reduction='none')
+    
+    def forward(self, outputs, targets):
+        # Base weighted cross-entropy loss
+        base_loss = self.base_criterion(outputs, targets)
+        
+        # Get predicted classes
+        predicted_classes = outputs.argmax(dim=1)
+        
+        # Heavy penalty for 9/10 confusion (most critical error)
+        grade_9_as_10 = (targets == 8) & (predicted_classes == 9)  # True 9 predicted as 10
+        grade_10_as_9 = (targets == 9) & (predicted_classes == 8)  # True 10 predicted as 9
+        critical_confusion = grade_9_as_10 | grade_10_as_9
+        
+        # Penalty for missing gem mint cards entirely (9/10 predicted as lower)
+        true_gem_mint = (targets >= 8)  # PSA 9 or 10
+        predicted_non_gem = (predicted_classes < 8)  # Predicted as PSA 8 or lower
+        missed_gem_mint = true_gem_mint & predicted_non_gem
+        
+        # Apply penalties
+        critical_penalty = base_loss * critical_confusion.float() * self.grade_9_10_penalty
+        gem_penalty = base_loss * missed_gem_mint.float() * self.non_gem_penalty
+        
+        # Combine all losses
+        total_loss = base_loss + critical_penalty + gem_penalty
+        
+        return total_loss.mean()
+
+
 class PSADualImageDataset(Dataset):
     """Dataset that loads both front and back images for each card"""
     
@@ -211,12 +248,22 @@ class PSADualTrainer:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         
+        # Preprocessing for raw cards (without slabs)
+        raw_card_transform = transforms.Compose([
+            transforms.Resize((target_height, target_width)),
+            # Add slight padding to simulate slab spacing
+            transforms.Pad(padding=5, fill=0),
+            transforms.Resize((target_height, target_width)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        
         print(f"🖼️  Using natural aspect ratio: {target_width}x{target_height} (preserves card proportions)")
-        return train_transform, val_transform
+        return train_transform, val_transform, raw_card_transform
     
     def prepare_data(self, batch_size=32, train_split=0.7, val_split=0.2):
         """Prepare dual-input data loaders"""
-        train_transform, val_transform = self.get_transforms()
+        train_transform, val_transform, _ = self.get_transforms()  # Ignore raw_transform for training
         
         # Create full dataset
         full_dataset = PSADualImageDataset(self.data_dir, transform=val_transform)
@@ -254,16 +301,32 @@ class PSADualTrainer:
             num_workers=2, pin_memory=False
         )
     
-    def train_model(self, num_epochs=50, lr=1e-4, patience=7):
-        """Train the dual-input model"""
-        model = PSADualInputModel(num_classes=10, fusion_method=self.fusion_method, input_size=(80, 128))
+    def train_model(self, num_epochs=50, lr=1e-4, patience=7, use_larger_model=False, use_scheduler=True):
+        """Train the dual-input model with heavy PSA 9/10 focus"""
+        model = PSADualInputModel(num_classes=10, fusion_method=self.fusion_method, input_size=(80, 128), use_larger_model=use_larger_model)
         model = model.to(self.device)
         
-        # Loss and optimizer with class weights for PSA 9/10 focus
-        class_weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 3.0, 5.0]).to(self.device)
-        criterion = nn.CrossEntropyLoss(weight=class_weights)
+        # EXTREME class weights focusing on PSA 9/10 distinction
+        class_weights = torch.tensor([
+            0.5,   # Grade 1 - less important
+            0.5,   # Grade 2 - less important  
+            0.5,   # Grade 3 - less important
+            0.8,   # Grade 4
+            1.0,   # Grade 5
+            1.2,   # Grade 6
+            1.5,   # Grade 7
+            2.0,   # Grade 8
+            10.0,  # Grade 9 - CRITICAL (gem mint)
+            15.0   # Grade 10 - MOST CRITICAL (perfect)
+        ]).to(self.device)
+        
+        # Use custom loss function with extreme 9/10 penalties
+        criterion = PSA910FocusedLoss(class_weights, grade_9_10_penalty=100.0, non_gem_penalty=20.0)
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5)
+        
+        print(f"🎯 Using PSA 9/10 Focused Loss with 100x penalty for grade confusion!")
+        print(f"⚡ Class weights: Grades 1-8 get 0.5-2.0x, Grade 9 gets 10x, Grade 10 gets 15x weight")
         
         best_val_acc = 0.0
         patience_counter = 0
@@ -362,6 +425,49 @@ class PSADualTrainer:
         
         print(f"✅ Model saved: {model_path}")
         return model_path
+    
+    def predict_raw_card(self, front_img_path, back_img_path, model_path):
+        """Predict PSA grade for a raw (ungraded) card"""
+        # Load the trained model
+        model = PSADualInputModel(num_classes=10, fusion_method=self.fusion_method, input_size=(80, 128))
+        checkpoint = torch.load(model_path, map_location=self.device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(self.device)
+        model.eval()
+        
+        # Get raw card transform
+        _, _, raw_transform = self.get_transforms()
+        
+        # Load and preprocess images
+        front_img = Image.open(front_img_path).convert('RGB')
+        back_img = Image.open(back_img_path).convert('RGB')
+        
+        front_tensor = raw_transform(front_img).unsqueeze(0).to(self.device)
+        back_tensor = raw_transform(back_img).unsqueeze(0).to(self.device)
+        
+        # Predict
+        with torch.no_grad():
+            outputs = model(front_tensor, back_tensor)
+            probabilities = F.softmax(outputs, dim=1)
+            predicted_grade = outputs.argmax(dim=1).item() + 1  # Convert to 1-10 scale
+            confidence = probabilities.max().item()
+            
+        return {
+            'predicted_grade': predicted_grade,
+            'confidence': confidence,
+            'grade_probabilities': {f'PSA {i+1}': prob.item() for i, prob in enumerate(probabilities[0])},
+            'likely_range': self._get_grade_range(probabilities[0]),
+            'gem_mint_probability': probabilities[0][8:].sum().item(),  # PSA 9+10 combined
+            'perfect_grade_probability': probabilities[0][9].item(),      # PSA 10 only
+            'is_gem_mint_quality': probabilities[0][8:].sum().item() > 0.5,  # >50% chance of PSA 9/10
+            'is_perfect_quality': probabilities[0][9].item() > 0.3           # >30% chance of PSA 10
+        }
+    
+    def _get_grade_range(self, probabilities):
+        """Get likely grade range based on top predictions"""
+        top_3 = torch.topk(probabilities, 3)
+        grades = [idx.item() + 1 for idx in top_3.indices]
+        return f"PSA {min(grades)}-{max(grades)}"
 
 
 def main():
@@ -372,8 +478,40 @@ def main():
     parser.add_argument('--epochs', type=int, default=50, help='Number of training epochs')
     parser.add_argument('--batch-size', type=int, default=32, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--predict', action='store_true', help='Predict on raw card images')
+    parser.add_argument('--front-img', type=str, help='Path to front image of raw card')
+    parser.add_argument('--back-img', type=str, help='Path to back image of raw card')
+    parser.add_argument('--model-path', type=str, default='models/psa_dual_concat_best.pth', 
+                       help='Path to trained model')
     
     args = parser.parse_args()
+    
+    if args.predict:
+        if not args.front_img or not args.back_img:
+            print("❌ For prediction, provide --front-img and --back-img paths")
+            return
+            
+        print("🔍 Predicting PSA grade for raw card...")
+        trainer = PSADualTrainer('dataset', fusion_method=args.fusion)
+        result = trainer.predict_raw_card(args.front_img, args.back_img, args.model_path)
+        
+        print(f"\n📊 Raw Card Grade Prediction:")
+        print(f"🎯 Predicted Grade: PSA {result['predicted_grade']}")
+        print(f"📈 Confidence: {result['confidence']:.2%}")
+        print(f"📋 Likely Range: {result['likely_range']}")
+        print(f"💎 Gem Mint (9/10) Probability: {result['gem_mint_probability']:.2%}")
+        print(f"⭐ Perfect (10) Probability: {result['perfect_grade_probability']:.2%}")
+        print(f"🏆 Is Gem Mint Quality: {'YES' if result['is_gem_mint_quality'] else 'NO'}")
+        print(f"🌟 Is Perfect Quality: {'YES' if result['is_perfect_quality'] else 'NO'}")
+        
+        # Show recommendation
+        if result['is_perfect_quality']:
+            print(f"\n💰 RECOMMENDATION: Excellent PSA 10 candidate! Consider grading.")
+        elif result['is_gem_mint_quality']:
+            print(f"\n💰 RECOMMENDATION: Strong PSA 9+ candidate. Worth grading.")
+        else:
+            print(f"\n💰 RECOMMENDATION: May not achieve gem mint grades (PSA 9/10).")
+        return
     
     print("🎯 PSA Dual-Input Model Training")
     print("=" * 50)
@@ -388,6 +526,8 @@ def main():
         
         print(f"\n🎉 Training completed successfully!")
         print(f"📁 Model saved: {model_path}")
+        print(f"\n💡 To predict on raw cards:")
+        print(f"python dual_input_trainer.py --predict --front-img front.jpg --back-img back.jpg")
         
     except Exception as e:
         print(f"\n❌ Training failed: {e}")
